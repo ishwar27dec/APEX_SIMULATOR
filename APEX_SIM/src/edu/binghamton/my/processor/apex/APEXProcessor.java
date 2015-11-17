@@ -31,6 +31,7 @@ public class APEXProcessor {
 	private static String lastFetchedInstruction;
 	private static boolean isFetchDone, isDecodeDone, isExecuteDone, isMemoryDone, isWriteBackDone;
 	private static boolean BRANCH_TAKEN = false;
+	private static boolean JUMP_DETECTED = false;
 	private static boolean HALT_ALERT;
 	private static boolean ZERO_FLAG;
 
@@ -54,6 +55,7 @@ public class APEXProcessor {
 		isFetchDone = isDecodeDone = isExecuteDone = isMemoryDone = isWriteBackDone = false;
 		HALT_ALERT = false;
 		BRANCH_TAKEN = false;
+		JUMP_DETECTED = false;
 		ZERO_FLAG = false;
 		echo("\nSimulator state intialized successfully");
 	}
@@ -68,7 +70,6 @@ public class APEXProcessor {
 		while(cycle != cycleCount) {
 			//ADD HALT CONDITION FOR EXIT
 			if(HALT_ALERT && isFetchDone && isDecodeDone && isExecuteDone && isMemoryDone && isWriteBackDone) {
-				isFetchDone = isDecodeDone = isExecuteDone = isMemoryDone = isWriteBackDone = false;
 				break;
 			}
 
@@ -117,6 +118,7 @@ public class APEXProcessor {
 			case STORE_INSTRUCTION:
 			case BZ_INSTRUCTION:
 			case BNZ_INSTRUCTION:
+			case JUMP_INSTRUCTION:
 				//do nothing
 			break;
 
@@ -157,6 +159,7 @@ public class APEXProcessor {
 				case WRITE_BACK:
 				case BZ_INSTRUCTION:
 				case BNZ_INSTRUCTION:
+				case JUMP_INSTRUCTION:
 					//do nothing
 				break;
 
@@ -240,6 +243,20 @@ public class APEXProcessor {
 				}
 				break;
 
+			case JUMP_INSTRUCTION:
+			case BAL_INSTRUCTION:
+				String parts[] = instruction.split(" ");
+				Integer regValue = Integer.parseInt(parts[1]);
+				Integer literal = Integer.parseInt(parts[2]);
+				UPDATED_PC = regValue + literal;
+				if(actionType.equalsIgnoreCase(JUMP_INSTRUCTION))
+					instruction = parts[0] + " " + UPDATED_PC;
+
+				if(actionType.equalsIgnoreCase(BAL_INSTRUCTION))
+					instruction = "WB X " + (PC - 1);
+				JUMP_DETECTED = true;
+			break;
+
 			default:
 				break;
 			}
@@ -272,7 +289,7 @@ public class APEXProcessor {
 				decodeExecuteLatch.add(instruction);
 				printQueue.add(instruction);
 			} else {
-				if(BRANCH_TAKEN) {
+				if(BRANCH_TAKEN || JUMP_DETECTED) {
 					instruction = SQUASH_INSTRUCTION + " " + instruction;
 					lastTwoInstructions = SimulatorHelper.updateLastTwoInstructions("", lastTwoInstructions);
 					printQueue.add(instruction);
@@ -331,19 +348,25 @@ public class APEXProcessor {
 			} else {
 				String instruction = instructionList.get(PC++);
 				fetchDecodeLatch.add(instruction);
+
 				if(HALT_ALERT) {
 					isFetchDone = true;
 					String temp = fetchDecodeLatch.poll();
 					instruction = SQUASH_INSTRUCTION + " " + temp;
 					fetchDecodeLatch.add(instruction);
 				}
-				if(BRANCH_TAKEN) {
+
+				if(BRANCH_TAKEN || JUMP_DETECTED) {
 					String temp = fetchDecodeLatch.poll();
 					instruction = SQUASH_INSTRUCTION + " " + temp;
 					fetchDecodeLatch.add(instruction);
 					PC = UPDATED_PC;
-					BRANCH_TAKEN = false;
+					if(BRANCH_TAKEN)
+						BRANCH_TAKEN = false;
+					if(JUMP_DETECTED)
+						JUMP_DETECTED = false;
 				}
+
 				lastFetchedInstruction = instruction;
 				printQueue.add(instruction);
 			}
@@ -360,10 +383,9 @@ public class APEXProcessor {
 			instruction =  "WB " + operand1 + " " + getRegisterValueFromRF(operand2); // Ex. WB R1 6
 			break;
 
-		//Add case for BZ BNZ
-		case BZ_INSTRUCTION:
-		case BNZ_INSTRUCTION:
-			instruction = actionType + " " + getRegisterValueFromRF(operand1) + " " + operand2; //Ex BZ 0 20
+		case JUMP_INSTRUCTION:
+		case BAL_INSTRUCTION:
+			instruction = actionType + " " + getRegisterValueFromRF(operand1) + " " + operand2;
 			break;
 
 		default:
@@ -415,7 +437,7 @@ public class APEXProcessor {
 	}
 
 	private static boolean isRegisterName(String regName) {
-		if(regName.charAt(0) == 'R')
+		if(regName.charAt(0) == 'R' || regName.charAt(0) == 'X')
 			return true;
 		return false;
 	}
