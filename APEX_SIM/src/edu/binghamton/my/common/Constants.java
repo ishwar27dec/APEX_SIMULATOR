@@ -30,4 +30,5 @@ public class Constants {
 	public static final int SIMULATE = 2;
 	public static final int DISPLAY = 3;
 	public static final int EXIT = 4;
+	public static final String SPACE = " ";
 }

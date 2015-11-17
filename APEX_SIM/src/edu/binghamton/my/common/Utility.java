@@ -28,11 +28,11 @@ public class Utility {
 		Collections.sort(registerNames);
 
 		for(int i = 0; i < registerNames.size(); i++) {
-			System.out.print(justify(registerNames.get(i), 5));
+			System.out.print(justify(registerNames.get(i), 10));
 		}
 		System.out.print("\n");
 		for(int i = 0; i < registerNames.size(); i++) {
-			System.out.print(justify(String.valueOf(registerFileMap.get(registerNames.get(i))), 5));
+			System.out.print(justify(String.valueOf(registerFileMap.get(registerNames.get(i))), 10));
 		}
 
 		System.out.println("\n\nMemory Content");

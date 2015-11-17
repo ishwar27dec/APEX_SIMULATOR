@@ -13,9 +13,14 @@ import edu.binghamton.my.processor.apex.APEXProcessor;
 public class APEXSimulatorRunner {
 
 	public static void main(String[] args) {
+		if(args.length == 0) {
+			System.out.println("Instruction file name absent!!!");
+			System.exit(1);
+		}
 
 		Scanner scan = new Scanner(System.in);
-		File file = new File("instructions.txt");
+		File file = new File(args[0]);
+
 		while(true) {
 			displaySimulatorMenu();
 			int option = scan.nextInt();
@@ -24,18 +29,22 @@ public class APEXSimulatorRunner {
 			case INITIALIZE:
 				APEXProcessor.init(file);
 				break;
+
 			case SIMULATE:
 				System.out.print("Enter number of cycles : ");
 				int cycleCount = scan.nextInt();
 				APEXProcessor.simulate(cycleCount);
 				break;
+
 			case DISPLAY:
 				APEXProcessor.displaySimulationResult();
 				break;
+
 			case EXIT:
 				scan.close();
 				System.exit(0);
 				break;
+
 			default:
 				break;
 			}

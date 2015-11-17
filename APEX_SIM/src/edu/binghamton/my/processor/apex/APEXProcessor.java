@@ -32,6 +32,7 @@ public class APEXProcessor {
 	private static boolean isFetchDone, isDecodeDone, isExecuteDone, isMemoryDone, isWriteBackDone;
 	private static boolean BRANCH_TAKEN = false;
 	private static boolean JUMP_DETECTED = false;
+	private static boolean INVALID_PC = false;
 	private static boolean HALT_ALERT;
 	private static boolean ZERO_FLAG;
 
@@ -68,8 +69,7 @@ public class APEXProcessor {
 		int cycle = 0;
 		LinkedList<String> tempList = new LinkedList<>();
 		while(cycle != cycleCount) {
-			//ADD HALT CONDITION FOR EXIT
-			if(HALT_ALERT && isFetchDone && isDecodeDone && isExecuteDone && isMemoryDone && isWriteBackDone) {
+			if(INVALID_PC || (HALT_ALERT && isFetchDone && isDecodeDone && isExecuteDone && isMemoryDone && isWriteBackDone)) {
 				break;
 			}
 
@@ -87,9 +87,12 @@ public class APEXProcessor {
 		}
 		printQueue.addAll(tempList);
 
-		if(HALT_ALERT) {
+		if(cycle != cycleCount && (INVALID_PC ||HALT_ALERT)) {
 			displaySimulationResult();
-			echo("\nSimulation ended due to HALT instruction...");
+			if(HALT_ALERT)
+				echo("\nSimulation ended due to HALT instruction...");
+			if(INVALID_PC)
+				echo("\nSimulation ended due to bad PC value..." + PC);
 			System.exit(0);
 		}
 	}
@@ -112,7 +115,7 @@ public class APEXProcessor {
 			return;
 		}
 			
-		String actionType = instruction.split(" ")[0];
+		String actionType = instruction.split(SPACE)[0];
 		switch (actionType) {
 			case SQUASH_INSTRUCTION:
 			case STORE_INSTRUCTION:
@@ -124,7 +127,7 @@ public class APEXProcessor {
 
 			case WRITE_BACK:
 			case LOAD_INSTRUCTION:
-				String[] parts = instruction.split(" ");
+				String[] parts = instruction.split(SPACE);
 				String register = parts[1];
 				Integer value = Integer.parseInt(parts[2]);
 				REGISTER_FILE.put(register, value);
@@ -150,7 +153,7 @@ public class APEXProcessor {
 		if(HALT_INSTRUCTION.equalsIgnoreCase(instruction)) {
 			isMemoryDone = true;
 		} else {
-			String actionType = instruction.split(" ")[0];
+			String actionType = instruction.split(SPACE)[0];
 			String[] parts;
 			Integer result;
 			Integer index;
@@ -164,14 +167,14 @@ public class APEXProcessor {
 				break;
 
 				case LOAD_INSTRUCTION:
-					parts = instruction.split(" ");
+					parts = instruction.split(SPACE);
 					index = Integer.parseInt(parts[2]);
 					result = MEMORY_ARRAY[index];
-					instruction = actionType + " " + parts[1] + " " + result;
+					instruction = actionType + SPACE + parts[1] + SPACE + result;
 				break;
 
 				case STORE_INSTRUCTION:
-					parts = instruction.split(" ");
+					parts = instruction.split(SPACE);
 					result = Integer.parseInt(parts[1]);
 					index = Integer.parseInt(parts[2]);
 					MEMORY_ARRAY[index] = result;
@@ -201,7 +204,7 @@ public class APEXProcessor {
 		if(HALT_INSTRUCTION.equalsIgnoreCase(instruction)) {
 			isExecuteDone = true;
 		} else {
-			String actionType = instruction.split(" ")[0];
+			String actionType = instruction.split(SPACE)[0];
 			switch (actionType) {
 			case SQUASH_INSTRUCTION:
 			case WRITE_BACK:
@@ -214,7 +217,7 @@ public class APEXProcessor {
 			case AND_INSTRUCTION:
 			case EX_OR_INSTRUCTION:
 				instruction = SimulatorHelper.execute3OperandArithmeticOperation(instruction, actionType);
-				Integer operationResult = Integer.parseInt(instruction.split(" ")[2]);
+				Integer operationResult = Integer.parseInt(instruction.split(SPACE)[2]);
 				if(operationResult == 0) {
 					ZERO_FLAG = true;
 				} else {
@@ -229,7 +232,7 @@ public class APEXProcessor {
 
 			case BZ_INSTRUCTION:
 				if(ZERO_FLAG) {
-					Integer offSet = Integer.parseInt(instruction.split(" ")[1]);
+					Integer offSet = Integer.parseInt(instruction.split(SPACE)[1]);
 					UPDATED_PC = (PC - 1) + offSet;
 					BRANCH_TAKEN = true;
 				}
@@ -237,7 +240,7 @@ public class APEXProcessor {
 
 			case BNZ_INSTRUCTION:
 				if(!ZERO_FLAG) {
-					Integer offSet = Integer.parseInt(instruction.split(" ")[1]);
+					Integer offSet = Integer.parseInt(instruction.split(SPACE)[1]);
 					UPDATED_PC = (PC - 1) + offSet;
 					BRANCH_TAKEN = true;
 				}
@@ -245,12 +248,12 @@ public class APEXProcessor {
 
 			case JUMP_INSTRUCTION:
 			case BAL_INSTRUCTION:
-				String parts[] = instruction.split(" ");
+				String parts[] = instruction.split(SPACE);
 				Integer regValue = Integer.parseInt(parts[1]);
 				Integer literal = Integer.parseInt(parts[2]);
 				UPDATED_PC = regValue + literal;
 				if(actionType.equalsIgnoreCase(JUMP_INSTRUCTION))
-					instruction = parts[0] + " " + UPDATED_PC;
+					instruction = parts[0] + SPACE + UPDATED_PC;
 
 				if(actionType.equalsIgnoreCase(BAL_INSTRUCTION))
 					instruction = "WB X " + (PC - 1);
@@ -290,10 +293,10 @@ public class APEXProcessor {
 				printQueue.add(instruction);
 			} else {
 				if(BRANCH_TAKEN || JUMP_DETECTED) {
-					instruction = SQUASH_INSTRUCTION + " " + instruction;
+					instruction = SQUASH_INSTRUCTION + SPACE + instruction;
 					lastTwoInstructions = SimulatorHelper.updateLastTwoInstructions("", lastTwoInstructions);
 					printQueue.add(instruction);
-				}else if(SQUASH_INSTRUCTION.equals(instruction.split(" ")[0])) {
+				}else if(SQUASH_INSTRUCTION.equals(instruction.split(SPACE)[0])) {
 					lastTwoInstructions = SimulatorHelper.updateLastTwoInstructions("", lastTwoInstructions);
 					printQueue.add(instruction);
 				}
@@ -346,46 +349,51 @@ public class APEXProcessor {
 					printQueue.add("Done");
 				}
 			} else {
-				String instruction = instructionList.get(PC++);
-				fetchDecodeLatch.add(instruction);
-
-				if(HALT_ALERT) {
-					isFetchDone = true;
-					String temp = fetchDecodeLatch.poll();
-					instruction = SQUASH_INSTRUCTION + " " + temp;
+				if(PC > instructionList.size()) {
+					echo("Invalid PC value detected: " + PC);
+					INVALID_PC = true;
+				} else {
+					String instruction = instructionList.get(PC++);
 					fetchDecodeLatch.add(instruction);
-				}
 
-				if(BRANCH_TAKEN || JUMP_DETECTED) {
-					String temp = fetchDecodeLatch.poll();
-					instruction = SQUASH_INSTRUCTION + " " + temp;
-					fetchDecodeLatch.add(instruction);
-					PC = UPDATED_PC;
-					if(BRANCH_TAKEN)
-						BRANCH_TAKEN = false;
-					if(JUMP_DETECTED)
-						JUMP_DETECTED = false;
-				}
+					if(HALT_ALERT) {
+						isFetchDone = true;
+						String temp = fetchDecodeLatch.poll();
+						instruction = SQUASH_INSTRUCTION + SPACE + temp;
+						fetchDecodeLatch.add(instruction);
+					}
 
-				lastFetchedInstruction = instruction;
-				printQueue.add(instruction);
+					if(BRANCH_TAKEN || JUMP_DETECTED) {
+						String temp = fetchDecodeLatch.poll();
+						instruction = SQUASH_INSTRUCTION + SPACE + temp;
+						fetchDecodeLatch.add(instruction);
+						PC = UPDATED_PC;
+						if(BRANCH_TAKEN)
+							BRANCH_TAKEN = false;
+						if(JUMP_DETECTED)
+							JUMP_DETECTED = false;
+					}
+
+					lastFetchedInstruction = instruction;
+					printQueue.add(instruction);
+				}
 			}
 		}
 	}
 
 	private static String decode2OperandInstruction(String instruction) {
-		String actionType = instruction.split(" ")[0];
-		String operand1 = instruction.split(" ")[1];
-		String operand2 = instruction.split(" ")[2];
+		String actionType = instruction.split(SPACE)[0];
+		String operand1 = instruction.split(SPACE)[1];
+		String operand2 = instruction.split(SPACE)[2];
 		switch (actionType) {
 		case MOVC_INSTRUCTION:
 		case MOV_INSTRUCTION:
-			instruction =  "WB " + operand1 + " " + getRegisterValueFromRF(operand2); // Ex. WB R1 6
+			instruction =  "WB " + operand1 + SPACE + getRegisterValueFromRF(operand2); // Ex. WB R1 6
 			break;
 
 		case JUMP_INSTRUCTION:
 		case BAL_INSTRUCTION:
-			instruction = actionType + " " + getRegisterValueFromRF(operand1) + " " + operand2;
+			instruction = actionType + SPACE + getRegisterValueFromRF(operand1) + SPACE + operand2;
 			break;
 
 		default:
@@ -395,7 +403,7 @@ public class APEXProcessor {
 	}
 
 	private static String decode3OperandInstruction(String instruction) {
-		String[] parts = instruction.split(" ");
+		String[] parts = instruction.split(SPACE);
 		String destReg = parts[1];
 		String src1 = parts[2];
 		String src2 = parts[3];
@@ -412,15 +420,15 @@ public class APEXProcessor {
 		case EX_OR_INSTRUCTION:
 			src1Value = getRegisterValueFromRF(src1);
 			src2Value = getRegisterValueFromRF(src2);
-			instruction = actionType + " " + destReg + " " + src1Value + " " + src2Value;
+			instruction = actionType + SPACE + destReg + SPACE + src1Value + SPACE + src2Value;
 			break;
 
 		case STORE_INSTRUCTION:
-			instruction = actionType + " " + getRegisterValueFromRF(destReg) + " " + getRegisterValueFromRF(src1) + " " + getRegisterValueFromRF(src2);
+			instruction = actionType + SPACE + getRegisterValueFromRF(destReg) + SPACE + getRegisterValueFromRF(src1) + SPACE + getRegisterValueFromRF(src2);
 			break;
 
 		case LOAD_INSTRUCTION:
-			instruction = actionType + " " + destReg + " " + getRegisterValueFromRF(src1) + " " + getRegisterValueFromRF(src2);
+			instruction = actionType + SPACE + destReg + SPACE + getRegisterValueFromRF(src1) + SPACE + getRegisterValueFromRF(src2);
 			break;
 
 		default:
