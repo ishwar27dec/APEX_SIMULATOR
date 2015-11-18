@@ -14,12 +14,13 @@ public class Utility {
 		int noOfCycles = size / 5;
 
 		for(int i = 0; i < noOfCycles; i++) {
-			System.out.print("|" + justify(printQueue.poll()) + "|");
+			System.out.print("|" + justify(String.valueOf((i + 1))) + "|");
+			System.out.print(justify(printQueue.poll()) + "|");
 			System.out.print(justify(printQueue.poll()) + "|");
 			System.out.print(justify(printQueue.poll()) + "|");
 			System.out.print(justify(printQueue.poll()) + "|");
 			System.out.println(justify(printQueue.poll()) + "|");
-			System.out.println(repeat("-", 130));
+			System.out.println(repeat("-", 156));
 		}
 
 		System.out.println("\nRegister Content");
@@ -55,9 +56,9 @@ public class Utility {
 	}
 
 	public static void displayHeader() {
-		System.out.println(repeat("-", 130));
-		System.out.println("|" + justify("FETCH") + "|" + justify("DECODE") + "|" + justify("EXECUTE") + "|" + justify("MEMORY") + "|" + justify("WRITE-BACK") + "|");
-		System.out.println(repeat("-", 130));
+		System.out.println(repeat("-", 156));
+		System.out.println("|" + justify("Cycle") + "|" + justify("FETCH") + "|" + justify("DECODE") + "|" + justify("EXECUTE") + "|" + justify("MEMORY") + "|" + justify("WRITE-BACK") + "|");
+		System.out.println(repeat("-", 156));
 	}
 
 	public static String repeat(String data, int numberOfRepeatation) {
